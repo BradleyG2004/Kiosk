@@ -34,17 +34,17 @@ export async function action({ request }: { request: Request }) {
     const intent = formData.get('intent');
 
     try {
-        switch(intent) {
+        switch (intent) {
             case 'create-task': {
                 const task = await prisma.task.create({
                     data: {
                         title: formData.get('title') as string,
                         state: formData.get('state') as string,
                         description: formData.get('description') as string,
-                        owner: { 
-                            connect: { 
-                                id: Number(formData.get('ownerId')) 
-                            } 
+                        owner: {
+                            connect: {
+                                id: Number(formData.get('ownerId'))
+                            }
                         }
                     }
                 });
@@ -73,40 +73,6 @@ interface TaskFormData {
     ownerId: number;
 }
 
-function AddSubtaskButton({ taskId, onClick }: { taskId: number; onClick: () => void }) {
-    return (
-        <Button
-            style={{
-                borderColor: "green",
-                backgroundColor: "white",
-                color: "green",
-                fontWeight: "bold",
-            }}
-            onClick={onClick}
-        >
-            Add a subtask
-        </Button>
-    );
-}
-function DeleteButton({ taskId }: { taskId: number }) {
-    return (
-        <Button color="red">Remove</Button>
-    );
-}
-const tableData = {
-    head: ["", "Title", "State", "Owner", "Description", ""],
-    body: [
-        [6, 12.011, "C", "Carbon", <AddSubtaskButton taskId={6} title={"Carbon"} onClick={() => handleShowAddSubtask(taskId)} />, <DeleteButton taskId={6} />],
-        [7, 14.007, "N", "Nitrogen", <AddSubtaskButton taskId={7} />, <DeleteButton taskId={7} />],
-        [8, 88.906, "Y", "Yttrium", <AddSubtaskButton taskId={8} />, <DeleteButton taskId={8} />],
-        [9, 137.33, "Ba", "Barium", <AddSubtaskButton taskId={9} />, <DeleteButton taskId={9} />],
-        [10, 140.12, "Ce", "Cerium", <AddSubtaskButton taskId={10} />, <DeleteButton taskId={10} />],
-        [11, 88.906, "Y", "Yttrium", <AddSubtaskButton taskId={11} />, <DeleteButton taskId={11} />],
-        [12, 137.33, "Ba", "Barium", <AddSubtaskButton taskId={12} />, <DeleteButton taskId={12} />],
-        [13, 140.12, "Ce", "Cerium", <AddSubtaskButton taskId={13} />, <DeleteButton taskId={13} />],
-    ],
-};
-
 export const meta: MetaFunction = () => {
     return [
         { title: "Kiosk Audit" },
@@ -117,8 +83,6 @@ export const meta: MetaFunction = () => {
 export const handle = {
     breadcrumb: () => "Checklist",
 };
-
-
 
 export default function ChecklistPage() {
     const [showCreateTask, setShowCreateTask] = useState(false);
@@ -131,8 +95,8 @@ export default function ChecklistPage() {
         setShowCreateTask(!showCreateTask);
     };
 
-    const handleShowAddSubtask = (taskId: number) => {
-        setCurrentSubtask(currentSubtask === taskId ? null : taskId);
+    const handleShowAddSubtask = (taskObject) => {
+        setCurrentSubtask(taskObject); // Stocker l'objet tâche complet
     };
 
 
@@ -158,43 +122,51 @@ export default function ChecklistPage() {
     const handleSubmitTask = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        const formData = event.currentTarget;
+        const formData = new FormData(event.currentTarget as HTMLFormElement);
         const taskData: TaskFormData = {
-            title: (formData.elements.namedItem('name') as HTMLInputElement).value,
-            state: (formData.elements.namedItem('state') as HTMLSelectElement).value,
-            description: (formData.elements.namedItem('description') as HTMLTextAreaElement).value,
-            ownerId: parseInt((formData.elements.namedItem('owner') as HTMLSelectElement).value)
+            title: formData.get('name') as string,
+            state: formData.get('state') as string,
+            description: formData.get('description') as string,
+            ownerId: parseInt(formData.get('owner') as string),
         };
 
         try {
-            const newTask = await prisma.task.create({
-                data: {
-                    title: taskData.title,
-                    state: taskData.state,
-                    description: taskData.description,
-                    owner: { connect: { id: taskData.ownerId } }
-                },
-                include: { owner: true }
+            console.log("donneees" + JSON.stringify(taskData))
+            const response = await fetch('/create-task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskData)
             });
 
-            // Update tasks state with the new task
-            setTasks(prevTasks => [...prevTasks, newTask]);
-            setShowCreateTask(false);
+            // const data = await response.json();
+
+            if (!response.ok) {
+                const errorData = await response.json(); // Parse the error response from the server
+                alert(`Erreur lors de la création de la tâche : ${errorData.error}`);
+            } else {
+                alert('Tâche créée avec succès !');
+                window.location.reload();
+            }
+
         } catch (error) {
             console.error('Error creating task:', error);
+            alert('Une erreur inattendue s\'est produite.');
         }
     };
 
     const handleDeleteTask = async (taskId: number) => {
         try {
-            await prisma.task.delete({
-                where: { id: taskId }
-            });
+            const formData = new FormData();
+            formData.append('intent', 'delete-task');
+            formData.append('taskId', taskId.toString());
 
-            // Remove task from state
-            setTasks(prevTasks => prevTasks.filter(task => task.id !== taskId));
+            const response = await fetch('', {  // Submit to the current route
+                method: 'POST',
+                body: formData
+            });
+            window.location.reload();
         } catch (error) {
-            console.error('Error deleting task:', error);
+            window.location.reload();
         }
     };
 
@@ -220,7 +192,7 @@ export default function ChecklistPage() {
                     <label htmlFor="name" style={{ marginRight: "5px" }}>State:</label>
                     <Select
                         placeholder="State"
-                        data={["To Do", "Doing", "Done"]}
+                        data={["TODO", "DOING", "DONE"]}
                     />
                     <label htmlFor="name" style={{ marginRight: "5px" }}>Name:</label>
                     <input type="text" id="name" name="name" style={{ flex: 1 }} />
@@ -239,16 +211,17 @@ export default function ChecklistPage() {
                     </thead>
                     <tbody>
                         {tasks.map(task => (
-                            <tr key={task.id}>
+                            <tr key={task.id} style={{ textAlign: "center" }}>
                                 <td>{task.title}</td>
                                 <td>{task.state}</td>
                                 <td>{`${task.owner.firstName} ${task.owner.lastName}`}</td>
                                 <td>{task.description}</td>
                                 <td>
                                     <Button
-                                        onClick={() => handleShowAddSubtask(task.id)}
+                                        onClick={() => handleShowAddSubtask(task)}
                                         variant="light"
                                         color="green"
+                                        style={{ margin: "5px" }}
                                     >
                                         Add Subtask
                                     </Button>
@@ -277,7 +250,7 @@ export default function ChecklistPage() {
                             <Select
                                 name="state"
                                 label="State"
-                                data={["To Do", "Doing", "Done"]}
+                                data={["TODO", "DOING", "DONE"]}
                                 required
                             />
                             <label htmlFor="name" style={{ marginRight: "5px" }}>Owner: </label>
@@ -311,11 +284,11 @@ export default function ChecklistPage() {
                             <label htmlFor="name" style={{ marginRight: "5px" }}>State: </label>
                             <Select
                                 placeholder="Select an option"
-                                data={["To Do", "Done"]}
+                                data={["TODO", "DONE"]}
                             />
                         </form>
                     </div>
-                    <span style={{ margin: "5px", borderColor: "red", borderStyle: "solid", padding: "12px", borderWidth: "2px", borderRadius: "5px" }}>Principal task : <span style={{ color: "red" }}>{tableData.body.find(row => row[0] === currentSubtask)?.[3]} {/* Find and display the title of the selected task */}
+                    <span style={{ margin: "5px", borderColor: "red", borderStyle: "solid", padding: "12px", borderWidth: "2px", borderRadius: "5px" }}>Principal task : <span style={{ color: "red" }}>{currentSubtask ? currentSubtask.title : 'N/A'}
                     </span></span>
                     <Button variant="light" color="green" radius="md" style={{ fontWeight: "bold", width: "120px", borderStyle: "solid", borderColor: "green", marginLeft: "100px" }}>
                         <Text size="20px">Register</Text>
@@ -340,7 +313,7 @@ export default function ChecklistPage() {
                                 <td>state</td>
                                 <td>owner</td>
                                 <td>
-                                    <DeleteButton taskId={1} />
+                                    delete
                                 </td>
                             </tr>
                             <tr style={{ textAlign: "center" }}>
@@ -348,21 +321,21 @@ export default function ChecklistPage() {
                                 <td>state1</td>
                                 <td>owner1</td>
                                 <td>
-                                    <DeleteButton taskId={2} />
+                                    delete
                                 </td>
                             </tr><tr style={{ textAlign: "center" }}>
                                 <td>description2</td>
                                 <td>state2</td>
                                 <td>owner2</td>
                                 <td>
-                                    <DeleteButton taskId={3} />
+                                    delete
                                 </td>
                             </tr><tr style={{ textAlign: "center" }}>
                                 <td>description3</td>
                                 <td>state3</td>
                                 <td>owner3</td>
                                 <td>
-                                    <DeleteButton taskId={4} />
+                                    delete
                                 </td>
                             </tr>
                         </tbody>
@@ -372,4 +345,3 @@ export default function ChecklistPage() {
         </Stack>
     );
 }
-
