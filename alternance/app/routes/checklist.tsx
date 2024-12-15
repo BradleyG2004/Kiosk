@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useMemo } from 'react';
 import {
     Stack,
     Title,
@@ -89,7 +89,47 @@ export default function ChecklistPage() {
     const [currentSubtask, setCurrentSubtask] = useState<number | null>(null);
     const { users, tasks } = useLoaderData<typeof loader>();
 
-    const prisma = new PrismaClient();
+    const [filters, setFilters] = useState({
+        ownerId: '',   // Changé de null à ''
+        state: '',     // Changé de null à ''
+        title: ''      // Nouveau filtre pour le titre
+    });
+
+    // Utilisation de useMemo pour optimiser le filtrage
+    const filteredTasks = useMemo(() => {
+        return tasks.filter(task => {
+            // Filtre par propriétaire
+            const ownerMatch = !filters.ownerId || 
+                task.owner.id.toString() === filters.ownerId;
+
+            // Filtre par état
+            const stateMatch = !filters.state || 
+                task.state === filters.state;
+
+            // Filtre par titre (insensible à la casse)
+            const titleMatch = !filters.title || 
+                task.title.toLowerCase().includes(filters.title.toLowerCase());
+
+            return ownerMatch && stateMatch && titleMatch;
+        });
+    }, [tasks, filters]);
+
+    const updateFilter = (filterName: keyof typeof filters, value: string) => {
+        setFilters(prevFilters => ({
+            ...prevFilters,
+            [filterName]: value
+        }));
+    };
+
+    // Réinitialisation des filtres
+    const resetFilters = () => {
+        setFilters({
+            ownerId: '',
+            state: '',
+            title: ''
+        });
+    };
+
 
     const handleShowCreateTask = () => {
         setShowCreateTask(!showCreateTask);
@@ -184,18 +224,41 @@ export default function ChecklistPage() {
                     <label htmlFor="name" style={{ marginRight: "5px" }}>Owner:</label>
                     <Select
                         placeholder="Owner"
-                        data={users.map(user => ({
-                            label: `${user.firstName} ${user.lastName}`,
-                            value: user.id.toString()
-                        }))}
+                        value={filters.ownerId}
+                        onChange={(value) => updateFilter('ownerId', value || '')}
+                        data={[
+                            { value: '', label: 'All Owners' },
+                            ...users.map(user => ({
+                                label: `${user.firstName} ${user.lastName}`,
+                                value: user.id.toString()
+                            }))
+                        ]}
                     />
                     <label htmlFor="name" style={{ marginRight: "5px" }}>State:</label>
                     <Select
                         placeholder="State"
-                        data={["TODO", "DOING", "DONE"]}
+                        value={filters.state}
+                        onChange={(value) => updateFilter('state', value || '')}
+                        data={[
+                            { value: '', label: 'All States' },
+                            ...["TODO", "DOING", "DONE"].map(state => ({ 
+                                value: state, 
+                                label: state 
+                            }))
+                        ]}
                     />
                     <label htmlFor="name" style={{ marginRight: "5px" }}>Name:</label>
-                    <input type="text" id="name" name="name" style={{ flex: 1 }} />
+                    <input type="text" id="name" name="name" value={filters.title}
+                        onChange={(e) => updateFilter('title', e.target.value)}
+                        style={{ flex: 1 }} />
+                    <Button
+                        onClick={resetFilters}
+                        variant="light"
+                        color="red"
+                        style={{ marginLeft: "10px" }}
+                    >
+                        Reset Filters
+                    </Button>
                 </form>
             </div>
             <div style={{ borderStyle: "solid", borderColor: "green", borderRadius: "5px", overflow: "scroll", width: "100%", padding: "10px", height: "300px" }}>
@@ -210,7 +273,7 @@ export default function ChecklistPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {tasks.map(task => (
+                    {filteredTasks.map(task => (
                             <tr key={task.id} style={{ textAlign: "center" }}>
                                 <td>{task.title}</td>
                                 <td>{task.state}</td>
