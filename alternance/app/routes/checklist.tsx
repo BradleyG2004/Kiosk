@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState , useMemo ,FormEvent } from 'react';
 import {
     Stack,
     Title,
@@ -9,9 +9,8 @@ import {
     Select,
 } from "@mantine/core";
 import type { MetaFunction } from "@remix-run/node";
-import { FormEvent } from 'react';
 import { json } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -73,12 +72,12 @@ export async function action({ request }: { request: Request }) {
             case 'delete-task': {
                 const taskId = Number(formData.get('taskId'));
                 
-                // First, delete all associated subtasks
+                
                 await prisma.subtask.deleteMany({
                     where: { parentId: taskId }
                 });
 
-                // Then delete the task
+                
                 await prisma.task.delete({
                     where: { id: taskId }
                 });
@@ -125,12 +124,12 @@ export default function ChecklistPage() {
 
 
     const [filters, setFilters] = useState({
-        ownerId: '',   // Changé de null à ''
-        state: '',     // Changé de null à ''
-        title: ''      // Nouveau filtre pour le titre
+        ownerId: '',   
+        state: '',     
+        title: ''      
     });
 
-    // Utilisation de useMemo pour optimiser le filtrage
+    
     const filteredTasks = useMemo(() => {
         return tasks.filter(task => {
             // Filtre par propriétaire
@@ -149,11 +148,11 @@ export default function ChecklistPage() {
         });
     }, [tasks, filters]);
 
-    // New function to handle radio button selection
+    
     const handleTaskSelection = (task: any) => {
         setSelectedTask(task);
     
-        // Utilisez directement les sous-tâches de la tâche sélectionnée
+        
         setSelectedTaskSubtasks(task.subtasks || []);
     };
 
@@ -178,29 +177,6 @@ export default function ChecklistPage() {
         setShowCreateTask(!showCreateTask);
     };
 
-    // const handleShowAddSubtask = (taskObject) => {
-    //     setCurrentSubtask(taskObject); // Stocker l'objet tâche complet
-    // };
-
-
-
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const fetchedUsers = await prisma.user.findMany();
-                const fetchedTasks = await prisma.task.findMany({
-                    include: { owner: true } // Include owner details
-                });
-
-                setUsers(fetchedUsers);
-                setTasks(fetchedTasks);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
-        };
-
-        fetchData();
-    }, []);
 
     const handleSubmitTask = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -258,7 +234,7 @@ export default function ChecklistPage() {
             formData.append('intent', 'delete-subtask');
             formData.append('subtaskId', subtaskId.toString());
     
-            const response = await fetch('', {  // Submit to the current route
+            const response = await fetch('', {  
                 method: 'POST',
                 body: formData
             });
@@ -283,7 +259,6 @@ export default function ChecklistPage() {
     const handleSubmitSubtask = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        // Validate inputs
         if (!currentSubtask) {
             alert('No parent task selected');
             return;
